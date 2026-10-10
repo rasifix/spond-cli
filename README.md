@@ -2,46 +2,38 @@
 
 A small Node.js CLI with no external packages. It reads groups, members, events, and RSVPs through the unofficial Spond API. Requires Node.js **22 or newer**.
 
-## Installation
+## Usage
 
-From the extracted directory:
-
-```bash
-npm link
-spond --help
-```
-
-Alternatively, run it directly without a global installation:
+Run the CLI directly from npm without installing it globally:
 
 ```bash
-node bin/spond.js --help
-node bin/spond.js login
+npx --yes @rasifix/spond-cli@latest --help
 ```
 
-`npm link` registers the `spond` command locally on your computer. If the global npm directory is not writable, run the CLI directly with Node instead.
+The first run downloads the package into npm's cache. Run published-package examples outside a local `spond-cli` source checkout, because npm otherwise resolves the current project instead of the registry package.
 
 ## Commands
 
 ```bash
-spond login
-spond groups list
-spond members list --group YOUR_GROUP_ID
-spond players list --group YOUR_GROUP_ID
-spond guardians list --group YOUR_GROUP_ID
-spond events list --group YOUR_GROUP_ID
-spond events rsvp --group YOUR_GROUP_ID --event YOUR_EVENT_ID
-spond logout
+npx --yes @rasifix/spond-cli@latest login
+npx --yes @rasifix/spond-cli@latest groups list
+npx --yes @rasifix/spond-cli@latest members list --group YOUR_GROUP_ID
+npx --yes @rasifix/spond-cli@latest players list --group YOUR_GROUP_ID
+npx --yes @rasifix/spond-cli@latest guardians list --group YOUR_GROUP_ID
+npx --yes @rasifix/spond-cli@latest events list --group YOUR_GROUP_ID
+npx --yes @rasifix/spond-cli@latest events rsvp --group YOUR_GROUP_ID --event YOUR_EVENT_ID
+npx --yes @rasifix/spond-cli@latest logout
 ```
 
-`login` prompts interactively for an email address and password; the password remains hidden. Only the access token and its optional expiration date are stored. MFA/challenge flows and token refresh are not implemented. Run `spond login` again after the token expires. A failed login does not replace an existing token.
+`login` prompts interactively for an email address and password; the password remains hidden. Only the access token and its optional expiration date are stored. MFA/challenge flows and token refresh are not implemented. Run the `npx --yes @rasifix/spond-cli@latest login` command again after the token expires. A failed login does not replace an existing token.
 
 To specify a time range and a higher retrieval limit:
 
 ```bash
-spond events list --group YOUR_GROUP_ID \
+npx --yes @rasifix/spond-cli@latest events list --group YOUR_GROUP_ID \
   --from 2026-10-01 --to 2026-11-01 --limit 200
 
-spond events rsvp --group YOUR_GROUP_ID --event YOUR_EVENT_ID \
+npx --yes @rasifix/spond-cli@latest events rsvp --group YOUR_GROUP_ID --event YOUR_EVENT_ID \
   --from 2026-10-01 --to 2026-11-01 --limit 200
 ```
 
@@ -50,12 +42,12 @@ Dates without a time represent midnight UTC. To use local day boundaries, provid
 For machine-readable output:
 
 ```bash
-spond groups list --json
-spond members list --group YOUR_GROUP_ID --json
-spond players list --group YOUR_GROUP_ID --json
-spond guardians list --group YOUR_GROUP_ID --json
-spond events list --group YOUR_GROUP_ID --json
-spond events rsvp --group YOUR_GROUP_ID --event YOUR_EVENT_ID --json
+npx --yes @rasifix/spond-cli@latest groups list --json
+npx --yes @rasifix/spond-cli@latest members list --group YOUR_GROUP_ID --json
+npx --yes @rasifix/spond-cli@latest players list --group YOUR_GROUP_ID --json
+npx --yes @rasifix/spond-cli@latest guardians list --group YOUR_GROUP_ID --json
+npx --yes @rasifix/spond-cli@latest events list --group YOUR_GROUP_ID --json
+npx --yes @rasifix/spond-cli@latest events rsvp --group YOUR_GROUP_ID --event YOUR_EVENT_ID --json
 ```
 
 JSON output is an array containing the displayed records. RSVP records contain `memberId`, `name`, and `status`. Warnings are written to stderr and data to stdout. Exit codes: 0 for success, 1 for an error, and 130 for an interactive cancellation. A successful list operation may still return incomplete results because of API limits.
@@ -80,7 +72,23 @@ Alternatively, set `SPOND_CONFIG_DIR` to a private directory. On macOS/Linux, th
 
 `logout` deletes the local token but does not revoke it on the server. The password and email address are not stored. Secrets cannot be passed as CLI arguments. Raw server error responses are not included in the output. JSON output and exported lists may contain personal data.
 
-## Testing
+## Development
+
+From the source checkout, run the CLI directly:
+
+```bash
+node bin/spond.js --help
+node bin/spond.js login
+```
+
+To register the local checkout as the global `spond` command during development:
+
+```bash
+npm link
+spond --help
+```
+
+Run the test suite with:
 
 ```bash
 npm test
