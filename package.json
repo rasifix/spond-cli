@@ -1,0 +1,23 @@
+{
+  "name": "@rasifix/spond-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Small read-only CLI for the unofficial Spond API",
+  "author": "Simon Raess <raess.simon@gmail.com>",
+  "license": "Apache-2.0",
+  "bin": {
+    "spond": "./bin/spond.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node bin/spond.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasifix/spond-cli.git"
+  }
+}
