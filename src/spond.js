@@ -14,28 +14,28 @@ export function createClient(token, fetchFn = fetch) {
           ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         ...(body ? { body: JSON.stringify(body) } : {})
       });
-    } catch { throw new SpondError('Spond nicht erreichbar (Netzwerk, Timeout oder Redirect).'); }
+    } catch { throw new SpondError('Spond is unreachable (network error, timeout, or redirect).'); }
     if (!response.ok) {
       const messages = { 401: path === 'auth2/login'
-        ? 'Anmeldung fehlgeschlagen. Zugangsdaten und Konto prüfen.'
-        : 'Token ungültig oder abgelaufen. Bitte spond login ausführen.',
-        403: 'Kein Zugriff. Gruppenrechte prüfen.', 429: 'Zu viele Anfragen. Bitte später erneut versuchen.' };
-      throw new SpondError(messages[response.status] ?? `Spond-Anfrage fehlgeschlagen (HTTP ${response.status}).`);
+        ? 'Login failed. Check your credentials and account.'
+        : 'Token is invalid or expired. Run spond login.',
+        403: 'Access denied. Check group permissions.', 429: 'Too many requests. Please try again later.' };
+      throw new SpondError(messages[response.status] ?? `Spond request failed (HTTP ${response.status}).`);
     }
     try { return await response.json(); }
-    catch { throw new SpondError('Spond hat kein gültiges JSON geliefert.'); }
+    catch { throw new SpondError('Spond returned invalid JSON.'); }
   }
   return {
     async login(email, password) {
       const data = await request('auth2/login', { method: 'POST', body: { email, password } });
       const access = data?.accessToken;
       if (typeof access?.token !== 'string' || !access.token || /[\r\n]/.test(access.token))
-        throw new SpondError('Anmeldung ohne Token: Zugangsdaten prüfen; MFA/Challenges werden nicht unterstützt.');
+        throw new SpondError('Login returned no token. Check your credentials; MFA and challenges are not supported.');
       return { token: access.token, ...(typeof access.expiration === 'string' ? { expiration: access.expiration } : {}) };
     },
     async groups() {
       const groups = await request('groups');
-      if (!Array.isArray(groups)) throw new SpondError('Unerwartete Gruppenstruktur.');
+      if (!Array.isArray(groups)) throw new SpondError('Unexpected group data structure.');
       return groups;
     },
     async events(groupId, { from, to, limit = 100 } = {}) {
@@ -43,7 +43,7 @@ export function createClient(token, fetchFn = fetch) {
         groupId, minStartTimestamp: from, maxStartTimestamp: to, max: limit,
         order: 'asc', scheduled: false, includeHidden: false, includeComments: true, addProfileInfo: true
       } });
-      if (!Array.isArray(events)) throw new SpondError('Unerwartete Eventstruktur.');
+      if (!Array.isArray(events)) throw new SpondError('Unexpected event data structure.');
       return events;
     }
   };
@@ -52,7 +52,7 @@ const statuses = { acceptedIds: 'accepted', declinedIds: 'declined', unansweredI
   waitinglistIds: 'waitinglist', unconfirmedIds: 'unconfirmed' };
 export function rsvpRows(event, members) {
   if (!event.responses || typeof event.responses !== 'object' || Array.isArray(event.responses))
-    throw new SpondError('RSVP nicht verfügbar; möglicherweise eingeschränkte Sichtbarkeit.');
+    throw new SpondError('RSVP data unavailable; visibility may be restricted.');
   const names = new Map(members.map(m => [m.id, [m.firstName, m.lastName].filter(Boolean).join(' ')]));
   const rows = [];
   const seen = new Set();
@@ -60,11 +60,11 @@ export function rsvpRows(event, members) {
     const ids = event.responses[field];
     if (ids === undefined) continue;
     if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string'))
-      throw new SpondError(`Unerwartete RSVP-Struktur: ${field}.`);
+      throw new SpondError(`Unexpected RSVP data structure: ${field}.`);
     for (const id of ids) {
-      if (seen.has(id)) throw new SpondError('Widersprüchliche oder doppelte RSVP-IDs.');
+      if (seen.has(id)) throw new SpondError('Conflicting or duplicate RSVP IDs.');
       seen.add(id);
-      rows.push({ memberId: id, name: names.get(id) || '(nicht zugeordnet)', status });
+      rows.push({ memberId: id, name: names.get(id) || '(unmapped)', status });
     }
   }
   return { rows, missingFields: Object.keys(statuses).filter(k => event.responses[k] === undefined),
@@ -76,10 +76,10 @@ export function guardianRows(members) {
   const rows = [], seen = new Set();
   for (const member of members) {
     if (member.guardians == null) continue;
-    if (!Array.isArray(member.guardians)) throw new SpondError('Unerwartete Guardians-Struktur.');
+    if (!Array.isArray(member.guardians)) throw new SpondError('Unexpected guardian data structure.');
     for (const guardian of member.guardians) {
       if (!guardian || typeof guardian.id !== 'string' || !guardian.id || typeof member.id !== 'string' || !member.id)
-        throw new SpondError('Guardian- oder Mitglieds-ID fehlt.');
+        throw new SpondError('Guardian or member ID is missing.');
       const key = JSON.stringify([guardian.id, member.id]);
       if (seen.has(key)) continue;
       seen.add(key);

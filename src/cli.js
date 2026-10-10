@@ -4,7 +4,7 @@ import { Writable } from 'node:stream';
 import { createClient, SpondError, rsvpRows, guardianRows, playerRows } from '../src/spond.js';
 import { tokenStore } from '../src/store.js';
 
-const HELP = `Spond CLI (Node.js 22+, inoffizielle API)
+const HELP = `Spond CLI (Node.js 22+, unofficial API)
 
   spond login
   spond logout
@@ -15,11 +15,11 @@ const HELP = `Spond CLI (Node.js 22+, inoffizielle API)
   spond events list --group GROUP_ID [--from ISO] [--to ISO] [--limit 100] [--json]
   spond events rsvp --group GROUP_ID --event EVENT_ID [--from ISO] [--to ISO] [--limit 100] [--json]
 
-ISO: Datum (YYYY-MM-DD, UTC) oder Datum/Zeit mit Z/Offset.
-Listen sind begrenzt; --limit setzt die angeforderte Obergrenze (1–1000).
-RSVP sucht das Event in derselben begrenzten Eventliste.
---json: Daten nach stdout, Warnungen/Fehler nach stderr.
-Token: ~/.config/spond-cli/token.json (oder SPOND_CONFIG_DIR).
+ISO: date (YYYY-MM-DD, UTC) or date/time with a Z suffix or UTC offset.
+Lists are limited; --limit sets the requested maximum (1–1000).
+RSVP searches for the event in the same limited event list.
+--json: data is written to stdout; warnings and errors are written to stderr.
+Token: ~/.config/spond-cli/token.json (or SPOND_CONFIG_DIR).
 `;
 function parse(args) {
   const commands = [], options = {};
@@ -27,12 +27,12 @@ function parse(args) {
     const arg = args[i];
     if (!arg.startsWith('--')) { commands.push(arg); continue; }
     const key = arg.slice(2);
-    if (!['json', 'group', 'event', 'from', 'to', 'limit'].includes(key)) throw new SpondError(`Unbekannte Option: ${arg}`);
-    if (Object.hasOwn(options, key)) throw new SpondError(`Doppelte Option: ${arg}`);
+    if (!['json', 'group', 'event', 'from', 'to', 'limit'].includes(key)) throw new SpondError(`Unknown option: ${arg}`);
+    if (Object.hasOwn(options, key)) throw new SpondError(`Duplicate option: ${arg}`);
     if (key === 'json') options[key] = true;
     else {
       const value = args[++i];
-      if (!value || value.startsWith('--')) throw new SpondError(`Wert fehlt: ${arg}`);
+      if (!value || value.startsWith('--')) throw new SpondError(`Missing value: ${arg}`);
       options[key] = value;
     }
   }
@@ -41,16 +41,16 @@ function parse(args) {
 function date(value) {
   if (value === undefined) return undefined;
   if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2}))?$/.test(value))
-    throw new SpondError('Datum als YYYY-MM-DD oder ISO-Zeit mit Z/Offset angeben.');
+    throw new SpondError('Specify a date as YYYY-MM-DD or an ISO date/time with a Z suffix or UTC offset.');
   const d = new Date(value);
-  if (!Number.isFinite(d.getTime()) || (value.length === 10 && d.toISOString().slice(0, 10) !== value)) throw new SpondError('Ungültiges Datum.');
+  if (!Number.isFinite(d.getTime()) || (value.length === 10 && d.toISOString().slice(0, 10) !== value)) throw new SpondError('Invalid date.');
   return d.toISOString();
 }
 async function prompt(label, hidden = false) {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) throw new SpondError('Login benötigt ein interaktives Terminal.');
+  if (!process.stdin.isTTY || !process.stdout.isTTY) throw new SpondError('Login requires an interactive terminal.');
   const output = hidden ? new Writable({ write(_chunk, _encoding, done) { done(); } }) : process.stdout;
   const rl = createInterface({ input: process.stdin, output, terminal: true });
-  const cancel = () => { rl.close(); process.stderr.write('\nAbgebrochen.\n'); process.exit(130); };
+  const cancel = () => { rl.close(); process.stderr.write('\nCancelled.\n'); process.exit(130); };
   rl.once('SIGINT', cancel);
   try {
     if (hidden) process.stdout.write(label);
@@ -61,7 +61,7 @@ async function prompt(label, hidden = false) {
 function safe(value) { return String(value ?? '').replace(/[\x00-\x1f\x7f-\x9f]/g, ' '); }
 function print(rows, json) {
   if (json) { console.log(JSON.stringify(rows, null, 2)); return; }
-  if (!rows.length) { console.log('Keine Einträge.'); return; }
+  if (!rows.length) { console.log('No entries.'); return; }
   const keys = Object.keys(rows[0]);
   const widths = keys.map(k => Math.min(64, Math.max(k.length, ...rows.map(r => safe(r[k]).length))));
   const line = row => keys.map((k, i) => safe(row[k]).slice(0, widths[i]).padEnd(widths[i])).join('  ');
@@ -78,23 +78,23 @@ async function main() {
     'events list': ['group', 'from', 'to', 'limit', 'json'],
     'events rsvp': ['group', 'event', 'from', 'to', 'limit', 'json']
   };
-  if (!Object.hasOwn(allowed, command)) throw new SpondError('Unbekannter Befehl. Siehe spond --help.');
-  for (const key of Object.keys(o)) if (!allowed[command].includes(key)) throw new SpondError(`Option --${key} passt nicht zu ${command}.`);
-  if (['members list', 'players list', 'guardians list', 'events list', 'events rsvp'].includes(command) && !o.group) throw new SpondError('--group ist erforderlich.');
-  if (command === 'events rsvp' && !o.event) throw new SpondError('--event ist erforderlich.');
+  if (!Object.hasOwn(allowed, command)) throw new SpondError('Unknown command. See spond --help.');
+  for (const key of Object.keys(o)) if (!allowed[command].includes(key)) throw new SpondError(`Option --${key} is not valid for ${command}.`);
+  if (['members list', 'players list', 'guardians list', 'events list', 'events rsvp'].includes(command) && !o.group) throw new SpondError('--group is required.');
+  if (command === 'events rsvp' && !o.event) throw new SpondError('--event is required.');
   const from = date(o.from), to = date(o.to);
-  if (from && to && from >= to) throw new SpondError('--from muss vor --to liegen.');
+  if (from && to && from >= to) throw new SpondError('--from must be earlier than --to.');
   const limit = o.limit === undefined ? 100 : Number(o.limit);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new SpondError('--limit muss eine ganze Zahl zwischen 1 und 1000 sein.');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new SpondError('--limit must be an integer between 1 and 1000.');
   const store = tokenStore();
-  if (command === 'logout') { await store.clear(); console.log('Lokaler Token gelöscht.'); return; }
+  if (command === 'logout') { await store.clear(); console.log('Local token deleted.'); return; }
   if (command === 'login') {
-    const email = (await prompt('Spond-E-Mail: ')).trim();
-    const password = await prompt('Spond-Passwort (verdeckt): ', true);
-    if (!email || !password) throw new SpondError('E-Mail und Passwort sind erforderlich.');
+    const email = (await prompt('Spond email: ')).trim();
+    const password = await prompt('Spond password (hidden): ', true);
+    if (!email || !password) throw new SpondError('Email and password are required.');
     const credentials = await createClient().login(email, password);
     await store.save(credentials);
-    console.log('Angemeldet. Token gespeichert; Passwort nicht gespeichert.'); return;
+    console.log('Logged in. Token saved; password not saved.'); return;
   }
   const client = createClient(await store.load());
   if (command === 'groups list') {
@@ -102,8 +102,8 @@ async function main() {
   }
   if (command === 'members list' || command === 'players list' || command === 'guardians list' || command === 'events rsvp') {
     const group = (await client.groups()).find(g => g.id === o.group);
-    if (!group) throw new SpondError('Gruppe nicht gefunden oder nicht zugänglich.');
-    if (!Array.isArray(group.members)) throw new SpondError('Mitgliederliste nicht verfügbar.');
+    if (!group) throw new SpondError('Group not found or inaccessible.');
+    if (!Array.isArray(group.members)) throw new SpondError('Member list unavailable.');
     if (command === 'members list') {
       print(group.members.map(m => ({ id: m.id, name: [m.firstName, m.lastName].filter(Boolean).join(' ') })), o.json); return;
     }
@@ -114,20 +114,20 @@ async function main() {
       print(guardianRows(group.members), o.json); return;
     }
     const events = await client.events(o.group, { from, to, limit });
-    if (events.length >= limit) console.error('Warnung: Event-Limit erreicht; Ergebnis möglicherweise unvollständig. Zeitraum eingrenzen.');
+    if (events.length >= limit) console.error('Warning: Event limit reached; results may be incomplete. Narrow the date range.');
     const event = events.find(e => e.id === o.event && e.recipients?.group?.id === o.group);
-    if (!event) throw new SpondError('Event nicht in der abgerufenen Gruppenliste gefunden. Zeitraum/Limit prüfen; versteckte oder geplante Events sind ausgeschlossen.');
+    if (!event) throw new SpondError('Event not found in the retrieved group list. Check the date range and limit; hidden or scheduled events are excluded.');
     const result = rsvpRows(event, group.members);
-    if (result.missingFields.length) console.error(`Hinweis: Nicht gelieferte RSVP-Felder: ${result.missingFields.join(', ')}. Keine Aussage über diese Zustände.`);
-    if (result.unknownFields.length) console.error('Warnung: Unbekannte RSVP-Listen vorhanden; Ausgabe möglicherweise unvollständig.');
+    if (result.missingFields.length) console.error(`Note: RSVP fields not returned: ${result.missingFields.join(', ')}. No status can be inferred for them.`);
+    if (result.unknownFields.length) console.error('Warning: Unknown RSVP lists are present; output may be incomplete.');
     print(result.rows, o.json); return;
   }
   const events = await client.events(o.group, { from, to, limit });
-  if (events.length >= limit) console.error('Warnung: Event-Limit erreicht; Ergebnis möglicherweise unvollständig. Zeitraum eingrenzen.');
-  if (events.some(e => e.recipients?.group?.id !== o.group)) throw new SpondError('Spond lieferte Events ohne passende Gruppen-ID.');
+  if (events.length >= limit) console.error('Warning: Event limit reached; results may be incomplete. Narrow the date range.');
+  if (events.some(e => e.recipients?.group?.id !== o.group)) throw new SpondError('Spond returned events without the requested group ID.');
   print(events.map(e => ({ id: e.id, title: e.heading, start: e.startTimestamp, end: e.endTimestamp ?? '' })), o.json);
 }
 main().catch(error => {
-  console.error(`Fehler: ${error instanceof SpondError ? error.message : 'Lokaler Vorgang fehlgeschlagen (Dateirechte oder Konfiguration prüfen).'}`);
+  console.error(`Error: ${error instanceof SpondError ? error.message : 'Local operation failed (check file permissions or configuration).'}`);
   process.exitCode = 1;
 });

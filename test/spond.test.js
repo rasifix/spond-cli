@@ -18,7 +18,7 @@ test('login sends expected body and extracts token, without refresh/password tok
   assert.deepEqual(await client.login('test@example.invalid', 'secret'), { token: 'abc', expiration: '2099-01-01' });
 });
 test('challenge without access token fails', async () => {
-  await assert.rejects(createClient(null, async () => Response.json({ challenge: 'private' })).login('a', 'b'), /ohne Token/);
+  await assert.rejects(createClient(null, async () => Response.json({ challenge: 'private' })).login('a', 'b'), /no token/);
 });
 test('GET events encodes group and filters and uses bearer token', async () => {
   const client = createClient('abc', async (url, opts) => {
@@ -39,8 +39,8 @@ test('HTTP errors never surface response secrets', async () => {
 });
 test('malformed responses and network failures fail safely', async () => {
   await assert.rejects(createClient('abc', async () => new Response('<html>')).groups(), /JSON/);
-  await assert.rejects(createClient('abc', async () => Response.json({})).events('g'), /Eventstruktur/);
-  await assert.rejects(createClient('abc', async () => { throw new Error('SECRET'); }).groups(), /nicht erreichbar/);
+  await assert.rejects(createClient('abc', async () => Response.json({})).events('g'), /event data structure/);
+  await assert.rejects(createClient('abc', async () => { throw new Error('SECRET'); }).groups(), /unreachable/);
 });
 test('RSVP preserves five states, child member identity and unmapped IDs', () => {
   const result = rsvpRows({ responses: {
@@ -48,19 +48,19 @@ test('RSVP preserves five states, child member identity and unmapped IDs', () =>
   } }, [{ id: 'child', firstName: 'Kind', lastName: 'Test', guardians: [{ id: 'guardian' }] }]);
   assert.deepEqual(result.rows.map(r => r.status), ['accepted', 'declined', 'unanswered', 'waitinglist', 'unconfirmed']);
   assert.equal(result.rows[0].name, 'Kind Test');
-  assert.equal(result.rows[1].name, '(nicht zugeordnet)');
+  assert.equal(result.rows[1].name, '(unmapped)');
   assert.deepEqual(result.missingFields, []);
 });
 test('missing RSVP fields are explicit; conflicting lists fail', () => {
   assert.equal(rsvpRows({ responses: { acceptedIds: [] } }, []).missingFields.length, 4);
-  assert.throws(() => rsvpRows({ responses: { acceptedIds: ['a'], declinedIds: ['a'] } }, []), /Widersprüchliche/);
-  assert.throws(() => rsvpRows({}, []), /nicht verfügbar/);
+  assert.throws(() => rsvpRows({ responses: { acceptedIds: ['a'], declinedIds: ['a'] } }, []), /Conflicting/);
+  assert.throws(() => rsvpRows({}, []), /unavailable/);
 });
 test('token lifecycle: private permissions, load, expiration and idempotent logout', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'spond-test-'));
   try {
     const store = tokenStore(dir);
-    await assert.rejects(store.load(), /Nicht angemeldet/);
+    await assert.rejects(store.load(), /Not logged in/);
     await store.save({ token: 'abc' });
     assert.equal(await store.load(), 'abc');
     if (process.platform !== 'win32') {
@@ -68,11 +68,11 @@ test('token lifecycle: private permissions, load, expiration and idempotent logo
       assert.equal((await stat(dir)).mode & 0o777, 0o700);
     }
     await store.save({ token: 'def', expiration: '2000-01-01' });
-    await assert.rejects(store.load(), /abgelaufen/);
+    await assert.rejects(store.load(), /expired/);
     await writeFile(join(dir, 'token.json'), 'not json');
-    await assert.rejects(store.load(), /nicht lesbar/);
+    await assert.rejects(store.load(), /cannot be read/);
     await store.clear(); await store.clear();
-    await assert.rejects(store.load(), /Nicht angemeldet/);
+    await assert.rejects(store.load(), /Not logged in/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 test('CLI help and argument validation work without network', () => {
@@ -83,8 +83,8 @@ test('CLI help and argument validation work without network', () => {
   assert.match(run(['players', 'list']).stderr, /--group/);
   assert.match(run(['events', 'rsvp', '--group', 'g']).stderr, /--event/);
   assert.match(run(['events', 'list', '--group', 'g', '--limit', '0']).stderr, /--limit/);
-  assert.match(run(['events', 'list', '--group', 'g', '--from', '2026-02-30']).stderr, /Ungültiges Datum/);
-  assert.match(run(['login', '--password', 'secret']).stderr, /Unbekannte Option/);
+  assert.match(run(['events', 'list', '--group', 'g', '--from', '2026-02-30']).stderr, /Invalid date/);
+  assert.match(run(['login', '--password', 'secret']).stderr, /Unknown option/);
 });
 
 test('players include only respondent members', () => {
@@ -109,6 +109,6 @@ test('guardians retain member links, deduplicate pairs and tolerate absent lists
     { guardianId: 'g2', name: 'Sam', email: '', memberId: 'm2', memberName: 'Kind 2' }
   ]);
   assert.deepEqual(guardianRows([]), []);
-  assert.throws(() => guardianRows([{ id: 'm', guardians: {} }]), /Guardians-Struktur/);
-  assert.throws(() => guardianRows([{ id: 'm', guardians: [{}] }]), /ID fehlt/);
+  assert.throws(() => guardianRows([{ id: 'm', guardians: {} }]), /guardian data structure/);
+  assert.throws(() => guardianRows([{ id: 'm', guardians: [{}] }]), /ID is missing/);
 });
