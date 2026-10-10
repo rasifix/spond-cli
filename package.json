@@ -1,7 +1,6 @@
 {
   "name": "@rasifix/spond-cli",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Small read-only CLI for the unofficial Spond API",
   "author": "Simon Raess <raess.simon@gmail.com>",
