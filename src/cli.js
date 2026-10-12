@@ -12,8 +12,8 @@ const HELP = `Spond CLI (Node.js 22+, unofficial API)
   spond members list --group GROUP_ID [--subgroup SUBGROUP_ID] [--json]
   spond players list --group GROUP_ID [--subgroup SUBGROUP_ID] [--json]
   spond guardians list --group GROUP_ID [--subgroup SUBGROUP_ID] [--json]
-  spond events list --group GROUP_ID [--subgroup SUBGROUP_ID] [--from ISO] [--to ISO] [--limit 100] [--json]
-  spond events rsvp --group GROUP_ID --event EVENT_ID [--subgroup SUBGROUP_ID] [--from ISO] [--to ISO] [--limit 100] [--json]
+  spond events list --group GROUP_ID [--subgroup SUBGROUP_ID] [--from ISO] [--to ISO] [--limit 100] [--include-hidden] [--include-scheduled] [--json]
+  spond events rsvp --group GROUP_ID --event EVENT_ID [--subgroup SUBGROUP_ID] [--from ISO] [--to ISO] [--limit 100] [--include-hidden] [--include-scheduled] [--json]
 
 ISO: date (YYYY-MM-DD, UTC) or date/time with a Z suffix or UTC offset.
 Lists are limited; --limit sets the requested maximum (1–1000).
@@ -27,9 +27,9 @@ function parse(args) {
     const arg = args[i];
     if (!arg.startsWith('--')) { commands.push(arg); continue; }
     const key = arg.slice(2);
-    if (!['json', 'group', 'subgroup', 'event', 'from', 'to', 'limit'].includes(key)) throw new SpondError(`Unknown option: ${arg}`);
+    if (!['json', 'include-hidden', 'include-scheduled', 'group', 'subgroup', 'event', 'from', 'to', 'limit'].includes(key)) throw new SpondError(`Unknown option: ${arg}`);
     if (Object.hasOwn(options, key)) throw new SpondError(`Duplicate option: ${arg}`);
-    if (key === 'json') options[key] = true;
+    if (['json', 'include-hidden', 'include-scheduled'].includes(key)) options[key] = true;
     else {
       const value = args[++i];
       if (!value || value.startsWith('--')) throw new SpondError(`Missing value: ${arg}`);
@@ -76,8 +76,8 @@ async function main() {
     login: [], logout: [], 'groups list': ['json'], 'members list': ['group', 'subgroup', 'json'],
     'players list': ['group', 'subgroup', 'json'],
     'guardians list': ['group', 'subgroup', 'json'],
-    'events list': ['group', 'subgroup', 'from', 'to', 'limit', 'json'],
-    'events rsvp': ['group', 'subgroup', 'event', 'from', 'to', 'limit', 'json']
+    'events list': ['group', 'subgroup', 'from', 'to', 'limit', 'include-hidden', 'include-scheduled', 'json'],
+    'events rsvp': ['group', 'subgroup', 'event', 'from', 'to', 'limit', 'include-hidden', 'include-scheduled', 'json']
   };
   if (!Object.hasOwn(allowed, command)) throw new SpondError('Unknown command. See spond --help.');
   for (const key of Object.keys(o)) if (!allowed[command].includes(key)) throw new SpondError(`Option --${key} is not valid for ${command}.`);
@@ -115,7 +115,7 @@ async function main() {
     if (command === 'guardians list') {
       print(guardianRows(members), o.json); return;
     }
-    const events = await client.events(group.id, { from, to, limit, subgroupId });
+    const events = await client.events(group.id, { from, to, limit, subgroupId, includeHidden: !!o['include-hidden'], includeScheduled: !!o['include-scheduled'] });
     if (events.length >= limit) console.error('Warning: Event limit reached; results may be incomplete. Narrow the date range.');
     const event = events.find(e => e.id === o.event && e.recipients?.group?.id === group.id);
     if (!event) throw new SpondError('Event not found in the retrieved group list. Check the date range and limit; hidden or scheduled events are excluded.');
@@ -125,7 +125,7 @@ async function main() {
     print(result.rows, o.json); return;
   }
   const { group, subgroupId } = resolveGroup(await client.groups(), o.group, o.subgroup);
-  const events = await client.events(group.id, { from, to, limit, subgroupId });
+  const events = await client.events(group.id, { from, to, limit, subgroupId, includeHidden: !!o['include-hidden'], includeScheduled: !!o['include-scheduled'] });
   if (events.length >= limit) console.error('Warning: Event limit reached; results may be incomplete. Narrow the date range.');
   if (events.some(e => e.recipients?.group?.id !== group.id)) throw new SpondError('Spond returned events without the requested group ID.');
   print(events.map(e => ({ id: e.id, title: e.heading, start: e.startTimestamp, end: e.endTimestamp ?? '' })), o.json);

@@ -32,6 +32,14 @@ test('GET events encodes group and filters and uses bearer token', async () => {
   });
   assert.deepEqual(await client.events('group&test', { limit: 50 }), []);
 });
+test('GET events can include hidden and scheduled events', async () => {
+  const client = createClient('abc', async url => {
+    assert.equal(url.searchParams.get('includeHidden'), 'true');
+    assert.equal(url.searchParams.get('scheduled'), 'true');
+    return Response.json([]);
+  });
+  assert.deepEqual(await client.events('g', { includeHidden: true, includeScheduled: true }), []);
+});
 test('GET events can be filtered to a subgroup', async () => {
   const client = createClient('abc', async url => {
     assert.equal(url.searchParams.get('groupId'), 'group-id');

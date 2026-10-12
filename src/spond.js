@@ -38,10 +38,10 @@ export function createClient(token, fetchFn = fetch) {
       if (!Array.isArray(groups)) throw new SpondError('Unexpected group data structure.');
       return groups;
     },
-    async events(groupId, { from, to, limit = 100, subgroupId } = {}) {
+    async events(groupId, { from, to, limit = 100, subgroupId, includeHidden = false, includeScheduled = false } = {}) {
       const events = await request('sponds', { params: {
         groupId, subGroupId: subgroupId, minStartTimestamp: from, maxStartTimestamp: to, max: limit,
-        order: 'asc', scheduled: false, includeHidden: false, includeComments: true, addProfileInfo: true
+        order: 'asc', scheduled: includeScheduled, includeHidden, includeComments: true, addProfileInfo: true
       } });
       if (!Array.isArray(events)) throw new SpondError('Unexpected event data structure.');
       return events;
