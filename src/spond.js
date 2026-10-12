@@ -67,6 +67,28 @@ export function groupRows(groups) {
   return rows;
 }
 
+// Accepts a group ID or, as shown by `groups list`, a subgroup ID in place of the group.
+export function resolveGroup(groups, groupId, subgroupId) {
+  let group = groups.find(g => g?.id === groupId);
+  let sub = subgroupId;
+  if (!group) {
+    group = groups.find(g => Array.isArray(g?.subGroups) && g.subGroups.some(s => s?.id === groupId));
+    if (group) {
+      if (sub !== undefined && sub !== groupId) throw new SpondError('--group is a subgroup; it conflicts with --subgroup.');
+      sub = groupId;
+    }
+  }
+  if (!group) throw new SpondError('Group not found or inaccessible.');
+  if (sub !== undefined && !(Array.isArray(group.subGroups) && group.subGroups.some(s => s?.id === sub)))
+    throw new SpondError('Subgroup not found in the group.');
+  return { group, subgroupId: sub };
+}
+
+export function subgroupMembers(members, subgroupId) {
+  if (subgroupId === undefined) return members;
+  return members.filter(m => Array.isArray(m?.subGroups) && m.subGroups.includes(subgroupId));
+}
+
 const statuses = { acceptedIds: 'accepted', declinedIds: 'declined', unansweredIds: 'unanswered',
   waitinglistIds: 'waitinglist', unconfirmedIds: 'unconfirmed' };
 export function rsvpRows(event, members) {

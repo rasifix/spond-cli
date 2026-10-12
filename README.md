@@ -39,7 +39,7 @@ npx --yes @rasifix/spond-cli@latest events rsvp --group YOUR_GROUP_ID --event YO
   --from 2026-10-01 --to 2026-11-01 --limit 200
 ```
 
-`groups list` includes both groups and their subgroups. Each row has `id`, `name`, and `parentId`; `parentId` is empty for a group and contains the parent group ID for a subgroup. For subgroup events, pass both the parent `--group` ID and `--subgroup` ID. Member, player, and guardian lists remain scoped to the whole parent group.
+`groups list` includes both groups and their subgroups. Each row has `id`, `name`, and `parentId`; `parentId` is empty for a group and contains the parent group ID for a subgroup. All group-scoped commands accept `--subgroup`: for `members`, `players`, and `guardians` it restricts the output to members of that subgroup (based on each member's `subGroups`), and for `events` it filters by subgroup. As a shortcut, a subgroup ID from `groups list` may also be passed directly as `--group`.
 
 Dates without a time represent midnight UTC. To use local day boundaries, provide an ISO timestamp with the appropriate offset, for example `2026-10-01T00:00:00+02:00`. Spond determines whether filter boundaries are inclusive or exclusive. Timestamps are output in ISO/UTC format.
 
