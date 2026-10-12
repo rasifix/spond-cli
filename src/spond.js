@@ -38,9 +38,9 @@ export function createClient(token, fetchFn = fetch) {
       if (!Array.isArray(groups)) throw new SpondError('Unexpected group data structure.');
       return groups;
     },
-    async events(groupId, { from, to, limit = 100 } = {}) {
+    async events(groupId, { from, to, limit = 100, subgroupId } = {}) {
       const events = await request('sponds', { params: {
-        groupId, minStartTimestamp: from, maxStartTimestamp: to, max: limit,
+        groupId, subGroupId: subgroupId, minStartTimestamp: from, maxStartTimestamp: to, max: limit,
         order: 'asc', scheduled: false, includeHidden: false, includeComments: true, addProfileInfo: true
       } });
       if (!Array.isArray(events)) throw new SpondError('Unexpected event data structure.');
@@ -48,6 +48,25 @@ export function createClient(token, fetchFn = fetch) {
     }
   };
 }
+
+export function groupRows(groups) {
+  if (!Array.isArray(groups)) throw new SpondError('Unexpected group data structure.');
+  const rows = [];
+  for (const group of groups) {
+    if (!group || typeof group.id !== 'string' || typeof group.name !== 'string')
+      throw new SpondError('Unexpected group data structure.');
+    rows.push({ id: group.id, name: group.name, parentId: '' });
+    if (group.subGroups === undefined) continue;
+    if (!Array.isArray(group.subGroups)) throw new SpondError('Unexpected subgroup data structure.');
+    for (const subgroup of group.subGroups) {
+      if (!subgroup || typeof subgroup.id !== 'string' || typeof subgroup.name !== 'string')
+        throw new SpondError('Unexpected subgroup data structure.');
+      rows.push({ id: subgroup.id, name: subgroup.name, parentId: group.id });
+    }
+  }
+  return rows;
+}
+
 const statuses = { acceptedIds: 'accepted', declinedIds: 'declined', unansweredIds: 'unanswered',
   waitinglistIds: 'waitinglist', unconfirmedIds: 'unconfirmed' };
 export function rsvpRows(event, members) {

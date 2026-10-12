@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
-import { createClient, SpondError, rsvpRows, guardianRows, playerRows } from '../src/spond.js';
+import { createClient, SpondError, groupRows, rsvpRows, guardianRows, playerRows } from '../src/spond.js';
 import { tokenStore } from '../src/store.js';
 
 const HELP = `Spond CLI (Node.js 22+, unofficial API)
@@ -12,8 +12,8 @@ const HELP = `Spond CLI (Node.js 22+, unofficial API)
   spond members list --group GROUP_ID [--json]
   spond players list --group GROUP_ID [--json]
   spond guardians list --group GROUP_ID [--json]
-  spond events list --group GROUP_ID [--from ISO] [--to ISO] [--limit 100] [--json]
-  spond events rsvp --group GROUP_ID --event EVENT_ID [--from ISO] [--to ISO] [--limit 100] [--json]
+  spond events list --group GROUP_ID [--subgroup SUBGROUP_ID] [--from ISO] [--to ISO] [--limit 100] [--json]
+  spond events rsvp --group GROUP_ID --event EVENT_ID [--subgroup SUBGROUP_ID] [--from ISO] [--to ISO] [--limit 100] [--json]
 
 ISO: date (YYYY-MM-DD, UTC) or date/time with a Z suffix or UTC offset.
 Lists are limited; --limit sets the requested maximum (1–1000).
@@ -27,7 +27,7 @@ function parse(args) {
     const arg = args[i];
     if (!arg.startsWith('--')) { commands.push(arg); continue; }
     const key = arg.slice(2);
-    if (!['json', 'group', 'event', 'from', 'to', 'limit'].includes(key)) throw new SpondError(`Unknown option: ${arg}`);
+    if (!['json', 'group', 'subgroup', 'event', 'from', 'to', 'limit'].includes(key)) throw new SpondError(`Unknown option: ${arg}`);
     if (Object.hasOwn(options, key)) throw new SpondError(`Duplicate option: ${arg}`);
     if (key === 'json') options[key] = true;
     else {
@@ -75,11 +75,12 @@ async function main() {
   const allowed = {
     login: [], logout: [], 'groups list': ['json'], 'members list': ['group', 'json'], 'players list': ['group', 'json'],
     'guardians list': ['group', 'json'],
-    'events list': ['group', 'from', 'to', 'limit', 'json'],
-    'events rsvp': ['group', 'event', 'from', 'to', 'limit', 'json']
+    'events list': ['group', 'subgroup', 'from', 'to', 'limit', 'json'],
+    'events rsvp': ['group', 'subgroup', 'event', 'from', 'to', 'limit', 'json']
   };
   if (!Object.hasOwn(allowed, command)) throw new SpondError('Unknown command. See spond --help.');
   for (const key of Object.keys(o)) if (!allowed[command].includes(key)) throw new SpondError(`Option --${key} is not valid for ${command}.`);
+  if (o.subgroup && !o.group) throw new SpondError('--group is required with --subgroup.');
   if (['members list', 'players list', 'guardians list', 'events list', 'events rsvp'].includes(command) && !o.group) throw new SpondError('--group is required.');
   if (command === 'events rsvp' && !o.event) throw new SpondError('--event is required.');
   const from = date(o.from), to = date(o.to);
@@ -98,7 +99,7 @@ async function main() {
   }
   const client = createClient(await store.load());
   if (command === 'groups list') {
-    print((await client.groups()).map(g => ({ id: g.id, name: g.name })), o.json); return;
+    print(groupRows(await client.groups()), o.json); return;
   }
   if (command === 'members list' || command === 'players list' || command === 'guardians list' || command === 'events rsvp') {
     const group = (await client.groups()).find(g => g.id === o.group);
@@ -113,7 +114,7 @@ async function main() {
     if (command === 'guardians list') {
       print(guardianRows(group.members), o.json); return;
     }
-    const events = await client.events(o.group, { from, to, limit });
+    const events = await client.events(o.group, { from, to, limit, subgroupId: o.subgroup });
     if (events.length >= limit) console.error('Warning: Event limit reached; results may be incomplete. Narrow the date range.');
     const event = events.find(e => e.id === o.event && e.recipients?.group?.id === o.group);
     if (!event) throw new SpondError('Event not found in the retrieved group list. Check the date range and limit; hidden or scheduled events are excluded.');
@@ -122,7 +123,7 @@ async function main() {
     if (result.unknownFields.length) console.error('Warning: Unknown RSVP lists are present; output may be incomplete.');
     print(result.rows, o.json); return;
   }
-  const events = await client.events(o.group, { from, to, limit });
+  const events = await client.events(o.group, { from, to, limit, subgroupId: o.subgroup });
   if (events.length >= limit) console.error('Warning: Event limit reached; results may be incomplete. Narrow the date range.');
   if (events.some(e => e.recipients?.group?.id !== o.group)) throw new SpondError('Spond returned events without the requested group ID.');
   print(events.map(e => ({ id: e.id, title: e.heading, start: e.startTimestamp, end: e.endTimestamp ?? '' })), o.json);

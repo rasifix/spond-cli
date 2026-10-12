@@ -21,7 +21,9 @@ npx --yes @rasifix/spond-cli@latest members list --group YOUR_GROUP_ID
 npx --yes @rasifix/spond-cli@latest players list --group YOUR_GROUP_ID
 npx --yes @rasifix/spond-cli@latest guardians list --group YOUR_GROUP_ID
 npx --yes @rasifix/spond-cli@latest events list --group YOUR_GROUP_ID
+npx --yes @rasifix/spond-cli@latest events list --group YOUR_GROUP_ID --subgroup YOUR_SUBGROUP_ID
 npx --yes @rasifix/spond-cli@latest events rsvp --group YOUR_GROUP_ID --event YOUR_EVENT_ID
+npx --yes @rasifix/spond-cli@latest events rsvp --group YOUR_GROUP_ID --subgroup YOUR_SUBGROUP_ID --event YOUR_EVENT_ID
 npx --yes @rasifix/spond-cli@latest logout
 ```
 
@@ -36,6 +38,8 @@ npx --yes @rasifix/spond-cli@latest events list --group YOUR_GROUP_ID \
 npx --yes @rasifix/spond-cli@latest events rsvp --group YOUR_GROUP_ID --event YOUR_EVENT_ID \
   --from 2026-10-01 --to 2026-11-01 --limit 200
 ```
+
+`groups list` includes both groups and their subgroups. Each row has `id`, `name`, and `parentId`; `parentId` is empty for a group and contains the parent group ID for a subgroup. For subgroup events, pass both the parent `--group` ID and `--subgroup` ID. Member, player, and guardian lists remain scoped to the whole parent group.
 
 Dates without a time represent midnight UTC. To use local day boundaries, provide an ISO timestamp with the appropriate offset, for example `2026-10-01T00:00:00+02:00`. Spond determines whether filter boundaries are inclusive or exclusive. Timestamps are output in ISO/UTC format.
 
@@ -54,7 +58,7 @@ JSON output is an array containing the displayed records. RSVP records contain `
 
 ## Behavior and limitations
 
-- Groups and members: ID and name.
+- Groups: ID and name, plus `parentId` for subgroup rows. Members: ID and name.
 - Players: members whose Spond `respondent` flag is `true`, with ID and name.
 - Guardians: one row per guardian/member relationship with `guardianId`, `name`, `email`, `memberId`, and `memberName`. A guardian of multiple children appears once for each child; identical duplicate relationships are removed. Data comes from `members[].guardians` in the selected group. Missing email addresses are returned as empty strings, while missing guardian lists produce no rows. Restricted visibility may limit the output.
 - Events: ID, title, start, and end. The default limit is 100; `--limit` accepts values from 1 to 1000. This is a requested limit, not guaranteed server capacity.

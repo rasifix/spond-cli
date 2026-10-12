@@ -4,7 +4,7 @@ import { mkdtemp, stat, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { createClient, rsvpRows, guardianRows, playerRows } from '../src/spond.js';
+import { createClient, groupRows, rsvpRows, guardianRows, playerRows } from '../src/spond.js';
 import { tokenStore } from '../src/store.js';
 
 test('login sends expected body and extracts token, without refresh/password tokens', async () => {
@@ -31,6 +31,28 @@ test('GET events encodes group and filters and uses bearer token', async () => {
     return Response.json([]);
   });
   assert.deepEqual(await client.events('group&test', { limit: 50 }), []);
+});
+test('GET events can be filtered to a subgroup', async () => {
+  const client = createClient('abc', async url => {
+    assert.equal(url.searchParams.get('groupId'), 'group-id');
+    assert.equal(url.searchParams.get('subGroupId'), 'subgroup-id');
+    return Response.json([]);
+  });
+  assert.deepEqual(await client.events('group-id', { subgroupId: 'subgroup-id' }), []);
+});
+test('group rows include subgroups with their parent group ID', () => {
+  assert.deepEqual(groupRows([
+    { id: 'g1', name: 'Club', subGroups: [
+      { id: 's1', name: 'Juniors' }, { id: 's2', name: 'Seniors' }
+    ] },
+    { id: 'g2', name: 'Other' }
+  ]), [
+    { id: 'g1', name: 'Club', parentId: '' },
+    { id: 's1', name: 'Juniors', parentId: 'g1' },
+    { id: 's2', name: 'Seniors', parentId: 'g1' },
+    { id: 'g2', name: 'Other', parentId: '' }
+  ]);
+  assert.throws(() => groupRows([{ id: 'g1', name: 'Club', subGroups: {} }]), /subgroup data structure/);
 });
 test('HTTP errors never surface response secrets', async () => {
   for (const status of [401, 403, 429, 500]) {
@@ -81,6 +103,8 @@ test('CLI help and argument validation work without network', () => {
   assert.equal(run(['--help']).status, 0);
   assert.match(run(['members', 'list']).stderr, /--group/);
   assert.match(run(['players', 'list']).stderr, /--group/);
+  assert.match(run(['events', 'list', '--subgroup', 's1']).stderr, /--group is required with --subgroup/);
+  assert.match(run(['members', 'list', '--group', 'g', '--subgroup', 's1']).stderr, /not valid for members list/);
   assert.match(run(['events', 'rsvp', '--group', 'g']).stderr, /--event/);
   assert.match(run(['events', 'list', '--group', 'g', '--limit', '0']).stderr, /--limit/);
   assert.match(run(['events', 'list', '--group', 'g', '--from', '2026-02-30']).stderr, /Invalid date/);
